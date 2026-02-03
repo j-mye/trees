@@ -7,28 +7,30 @@ def fill_missing_data(df: DataFrame) -> DataFrame:
     """
     Uses kNN to fill missing Height and Crown Width.
     Steps:
-    1. Encode 'scientific_name' as numeric codes for kNN.
+    1. Encode 'Scientific Name' as numeric codes for kNN.
     2. Impute 'Height' using 'DBH' and 'species_code'.
     3. Impute 'Crown Width' using 'DBH', 'Height', and 'species_code'.
     """
     df_filled = df.copy()
 
-
-    if 'scientific_name' in df_filled.columns:
-        df_filled['species_code'] = df_filled['scientific_name'].cat.codes
+    if 'Scientific Name' in df_filled.columns:
+        species_col = 'Scientific Name'
     else:
-        df_filled['species_code'] = pd.Categorical(df_filled['full_name']).codes
+        species_col = 'Full Name'
 
-    # Calculate Height first
-    height_features = ['DBH', 'species_code']
+    dummies = pd.get_dummies(df_filled[species_col], prefix='species', dummy_na=False)
+    species_features = dummies.columns.tolist()
+    
+    df_filled = pd.concat([df_filled, dummies], axis=1)
+
+    height_features = ['DBH'] + species_features
     df_filled = _run_knn_imputation(df_filled, 'Height', height_features)
 
-    # Calculate Crown Width next
-    width_features = ['DBH', 'Height', 'species_code']
+    width_features = ['DBH', 'Height'] + species_features
     df_filled = _run_knn_imputation(df_filled, 'Crown Width', width_features)
 
-    # Drop temporary species_code column
-    df_filled = df_filled.drop(columns=['species_code'])
+    # Remove temporary columns
+    df_filled = df_filled.drop(columns=species_features)
     
     return df_filled
 
@@ -46,7 +48,7 @@ def _run_knn_imputation(df: DataFrame, target: str, features: list) -> DataFrame
 
         # Set n_neighbors to a max of 30 local trees, at minimum 1
         n_samples = train_mask.sum()
-        n_neighbors = max(1, min(30, int(np.sqrt(n_samples))))
+        n_neighbors = max(5, min(30, int(np.sqrt(n_samples))))
 
         knn = KNeighborsRegressor(n_neighbors=n_neighbors, weights='distance')
         knn.fit(X_train, y_train)

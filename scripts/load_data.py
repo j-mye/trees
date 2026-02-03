@@ -1,5 +1,6 @@
 from pandas import DataFrame
 import pandas as pd
+import numpy as np
 
 data = {
     'Site ID': [],
@@ -78,7 +79,8 @@ data_types = {
     'Scientific Name': 'category',
 }
 
-path = '../data/raw/trees.csv'
+import os
+path = os.path.join(os.path.dirname(__file__), '../data/raw/trees.csv')
 
 def load_data() -> DataFrame:
     import csv
@@ -103,6 +105,12 @@ def convert_types() -> DataFrame:
         format='%m/%d/%Y, %I:%M:%S %p', 
         errors='coerce'
     )
+
+    df['Height'] = pd.to_numeric(df['Height'], errors='coerce')
+    df['Crown Width'] = pd.to_numeric(df['Crown Width'], errors='coerce')
+
+    df.loc[df['Height'] <= 0, 'Height'] = np.nan
+    df.loc[df['Crown Width'] <= 0, 'Crown Width'] = np.nan
 
     for key, dtype in data_types.items():
         if key in df.columns:

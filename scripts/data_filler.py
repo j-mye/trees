@@ -46,7 +46,7 @@ def _run_knn_imputation(df: DataFrame, target: str, features: list) -> DataFrame
         y_train = df.loc[train_mask, target]
         X_test = df.loc[missing_mask, features]
 
-        # Set n_neighbors to a max of 30 local trees, at minimum 1
+        # Set n_neighbors to a max of 30 local trees, at minimum 5
         n_samples = train_mask.sum()
         n_neighbors = max(5, min(30, int(np.sqrt(n_samples))))
 

@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Milwaukee Tree Risk Map - Quarter Section Analysis</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            width: 350px;
+            background: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+        
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .filter-section {
+            margin-bottom: 25px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .filter-section h3 {
+            font-size: 16px;
+            margin-bottom: 12px;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+        }
+        
+        .filter-group {
+            margin-bottom: 15px;
+        }
+        
+        .filter-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        .filter-group select,
+        .filter-group input[type="range"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .filter-group input[type="range"] {
+            padding: 0;
+        }
+        
+        .range-value {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            font-weight: normal;
+            cursor: pointer;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+        
+        .risk-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .risk-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .risk-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            border: 1px solid #333;
+        }
+        
+        .stats {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stats h3 {
+            font-size: 16px;
+            margin-bottom: 12px;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            z-index: 1000;
+            max-width: 300px;
+            display: none;
+        }
+        
+        .info-panel.active {
+            display: block;
+        }
+        
+        .info-panel h4 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .info-panel p {
+            margin: 5px 0;
+            font-size: 13px;
+            color: #555;
+        }
+        
+        .close-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+        }
+        
+        .close-btn:hover {
+            background: #c0392b;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background: #2980b9;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌳 Milwaukee Tree Risk Prioritization Map</h1>
+        <p>Quarter Section Risk Analysis - Interactive Dashboard</p>
+    </div>
+    
+    <div class="container">
+        <div class="sidebar">
+            <div class="stats" id="stats">
+                <h3>Statistics</h3>
+                <div class="loading">Loading data...</div>
+            </div>
+            
+            <div class="filter-section">
+                <h3>Risk Level Filter</h3>
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="risk-critical" checked>
+                        <span style="color: #c0392b;">Critical</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="risk-high" checked>
+                        <span style="color: #e67e22;">High</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="risk-medium" checked>
+                        <span style="color: #f39c12;">Medium</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="risk-low" checked>
+                        <span style="color: #27ae60;">Low</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="filter-section">
+                <h3>Risk Score Range</h3>
+                <div class="filter-group">
+                    <input type="range" id="risk-min" min="0" max="100" value="0">
+                    <div class="range-value">
+                        <span>Min: <span id="risk-min-value">0</span></span>
+                        <span>Max: <span id="risk-max-value">100</span></span>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <input type="range" id="risk-max" min="0" max="100" value="100">
+                </div>
+            </div>
+            
+            <div class="filter-section">
+                <h3>District Filter</h3>
+                <div class="filter-group">
+                    <select id="district-filter">
+                        <option value="all">All Districts</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="filter-section">
+                <h3>Tree Count Range</h3>
+                <div class="filter-group">
+                    <label>Minimum Trees</label>
+                    <input type="range" id="tree-min" min="0" max="1000" value="0">
+                    <div class="range-value">
+                        <span id="tree-min-value">0</span> trees
+                    </div>
+                </div>
+            </div>
+            
+            <div class="filter-section">
+                <h3>Display Options</h3>
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="show-trees" checked>
+                        Show Tree Points
+                    </label>
+                    <label>
+                        <input type="checkbox" id="show-labels">
+                        Show Quarter Section Labels
+                    </label>
+                </div>
+                <p style="font-size: 12px; color: #666; margin-top: 8px;">
+                    Tree counts are clustered: zoom in on a cluster to see the number (or individual trees at max zoom).
+                </p>
+            </div>
+            
+            <div class="filter-section">
+                <h3>Legend</h3>
+                <div class="risk-legend">
+                    <div class="risk-item">
+                        <div class="risk-color" style="background: #c0392b;"></div>
+                        <span>Critical (70-100)</span>
+                    </div>
+                    <div class="risk-item">
+                        <div class="risk-color" style="background: #e67e22;"></div>
+                        <span>High (50-70)</span>
+                    </div>
+                    <div class="risk-item">
+                        <div class="risk-color" style="background: #f39c12;"></div>
+                        <span>Medium (30-50)</span>
+                    </div>
+                    <div class="risk-item">
+                        <div class="risk-color" style="background: #27ae60;"></div>
+                        <span>Low (0-30)</span>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="applyFilters()">Apply Filters</button>
+            <button onclick="resetFilters()" style="background: #95a5a6; margin-top: 10px;">Reset</button>
+        </div>
+        
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="info-panel" id="info-panel">
+                <button class="close-btn" onclick="closeInfoPanel()">×</button>
+                <h4 id="info-title">Quarter Section Info</h4>
+                <div id="info-content"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    
+    <script>
+        let map;
+        let quarterSectionLayer;
+        let treeLayer;  // Now a MarkerClusterGroup when showing trees
+        let currentData = null;
+        let summaryData = null;
+        
+        // Initialize map
+        function initMap() {
+            // Default to Milwaukee center (will be updated when data loads)
+            map = L.map('map').setView([43.0389, -87.9065], 12);
+            
+            // Add tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+            
+            // Initialize layers
+            quarterSectionLayer = L.layerGroup().addTo(map);
+            treeLayer = L.markerClusterGroup({
+                maxClusterRadius: 40,
+                spiderfyOnMaxZoom: true,
+                showCoverageOnHover: false,
+                zoomToBoundsOnClick: true,
+                disableClusteringAtZoom: 18
+            });
+            map.addLayer(treeLayer);
+        }
+        
+        // Load data
+        async function loadData() {
+            try {
+                // Load summary first
+                const summaryResponse = await fetch('data/map_summary.json');
+                summaryData = await summaryResponse.json();
+                
+                // Update map view
+                map.setView([summaryData.bounds.center_lat, summaryData.bounds.center_lon], 12);
+                
+                // Update stats
+                updateStats(summaryData);
+                
+                // Populate district filter (remove duplicates)
+                const districtSelect = document.getElementById('district-filter');
+                const uniqueDistricts = [...new Set(summaryData.districts)];
+                uniqueDistricts.forEach(district => {
+                    const option = document.createElement('option');
+                    option.value = district;
+                    option.textContent = district;
+                    districtSelect.appendChild(option);
+                });
+                
+                // Load quarter sections GeoJSON
+                const geoJsonResponse = await fetch('data/quarter_sections_map.geojson');
+                currentData = await geoJsonResponse.json();
+                
+                // Render quarter sections
+                renderQuarterSections(currentData);
+                
+                // Load tree points
+                const treeResponse = await fetch('data/tree_points_sample.json');
+                const treeData = await treeResponse.json();
+                renderTreePoints(treeData);
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('stats').innerHTML = '<div class="loading">Error loading data. Please run prepare_map_data.py first.</div>';
+            }
+        }
+        
+        // Render quarter sections
+        function renderQuarterSections(data) {
+            quarterSectionLayer.clearLayers();
+            
+            data.features.forEach(feature => {
+                const props = feature.properties;
+                const riskScore = props.risk_score;
+                
+                // Determine color based on risk level
+                let color = '#27ae60'; // Low (green)
+                if (riskScore >= 70) color = '#c0392b'; // Critical (red)
+                else if (riskScore >= 50) color = '#e67e22'; // High (orange)
+                else if (riskScore >= 30) color = '#f39c12'; // Medium (yellow)
+                
+                // Create polygon
+                const polygon = L.polygon(feature.geometry.coordinates[0], {
+                    color: '#333',
+                    weight: 1,
+                    fillColor: color,
+                    fillOpacity: 0.6
+                });
+                
+                // Add popup
+                const popupContent = `
+                    <strong>Quarter Section ${props.quarter_section}</strong><br>
+                    Risk Level: <strong>${props.risk_level}</strong><br>
+                    Risk Score: ${riskScore.toFixed(1)}<br>
+                    Total Trees: ${props.total_trees}<br>
+                    Avg DBH: ${props.avg_dbh.toFixed(1)}"<br>
+                    District: ${props.district}
+                `;
+                
+                polygon.bindPopup(popupContent);
+                
+                // Add click handler
+                polygon.on('click', function() {
+                    showInfoPanel(props);
+                });
+                
+                // Store properties for filtering
+                polygon.featureProperties = props;
+                
+                quarterSectionLayer.addLayer(polygon);
+            });
+        }
+        
+        // Render tree points (no limit - every tree in the JSON is rendered).
+        // Trees are clustered so zoomed out you see counts (e.g. "700"); zoom in to see individuals.
+        function renderTreePoints(treeData) {
+            treeLayer.clearLayers();
+            
+            if (!document.getElementById('show-trees').checked) {
+                return;
+            }
+            
+            treeData.forEach(tree => {
+                const marker = L.circleMarker([tree.lat, tree.lon], {
+                    radius: 4,
+                    color: '#2c3e50',
+                    fillColor: '#3498db',
+                    fillOpacity: 0.5,
+                    weight: 1
+                });
+                
+                marker.bindPopup(`
+                    <strong>Tree</strong><br>
+                    DBH: ${tree.dbh.toFixed(1)}"<br>
+                    Condition: ${tree.condition}<br>
+                    Quarter Section: ${tree.quarter_section}
+                `);
+                
+                treeLayer.addLayer(marker);
+            });
+        }
+        
+        // Update statistics
+        function updateStats(summary) {
+            const stats = summary.statistics;
+            document.getElementById('stats').innerHTML = `
+                <h3>Statistics</h3>
+                <div class="stat-item">
+                    <span class="stat-label">Total Quarter Sections</span>
+                    <span class="stat-value">${stats.total_quarter_sections.toLocaleString()}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Trees</span>
+                    <span class="stat-value">${stats.total_trees.toLocaleString()}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Critical Risk</span>
+                    <span class="stat-value" style="color: #c0392b;">${stats.risk_levels.Critical}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">High Risk</span>
+                    <span class="stat-value" style="color: #e67e22;">${stats.risk_levels.High}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Medium Risk</span>
+                    <span class="stat-value" style="color: #f39c12;">${stats.risk_levels.Medium}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Low Risk</span>
+                    <span class="stat-value" style="color: #27ae60;">${stats.risk_levels.Low}</span>
+                </div>
+            `;
+        }
+        
+        // Apply filters
+        function applyFilters() {
+            if (!currentData) return;
+            
+            // Get filter values
+            const riskLevels = {
+                'Critical': document.getElementById('risk-critical').checked,
+                'High': document.getElementById('risk-high').checked,
+                'Medium': document.getElementById('risk-medium').checked,
+                'Low': document.getElementById('risk-low').checked
+            };
+            
+            const riskMin = parseFloat(document.getElementById('risk-min').value);
+            const riskMax = parseFloat(document.getElementById('risk-max').value);
+            const district = document.getElementById('district-filter').value;
+            const treeMin = parseFloat(document.getElementById('tree-min').value);
+            const showTrees = document.getElementById('show-trees').checked;
+            
+            // Filter and re-render
+            quarterSectionLayer.eachLayer(layer => {
+                const props = layer.featureProperties;
+                const visible = 
+                    riskLevels[props.risk_level] &&
+                    props.risk_score >= riskMin &&
+                    props.risk_score <= riskMax &&
+                    (district === 'all' || props.district === district) &&
+                    props.total_trees >= treeMin;
+                
+                if (visible) {
+                    map.addLayer(layer);
+                } else {
+                    map.removeLayer(layer);
+                }
+            });
+            
+            // Update tree visibility
+            if (showTrees) {
+                map.addLayer(treeLayer);
+            } else {
+                map.removeLayer(treeLayer);
+            }
+        }
+        
+        // Reset filters
+        function resetFilters() {
+            document.getElementById('risk-critical').checked = true;
+            document.getElementById('risk-high').checked = true;
+            document.getElementById('risk-medium').checked = true;
+            document.getElementById('risk-low').checked = true;
+            document.getElementById('risk-min').value = 0;
+            document.getElementById('risk-max').value = 100;
+            document.getElementById('district-filter').value = 'all';
+            document.getElementById('tree-min').value = 0;
+            document.getElementById('show-trees').checked = true;
+            
+            updateRangeValues();
+            applyFilters();
+        }
+        
+        // Update range value displays
+        function updateRangeValues() {
+            document.getElementById('risk-min-value').textContent = document.getElementById('risk-min').value;
+            document.getElementById('risk-max-value').textContent = document.getElementById('risk-max').value;
+            document.getElementById('tree-min-value').textContent = document.getElementById('tree-min').value;
+        }
+        
+        // Show info panel
+        function showInfoPanel(props) {
+            const panel = document.getElementById('info-panel');
+            const content = document.getElementById('info-content');
+            
+            content.innerHTML = `
+                <p><strong>Quarter Section:</strong> ${props.quarter_section}</p>
+                <p><strong>Risk Level:</strong> <span style="color: ${getRiskColor(props.risk_level)}">${props.risk_level}</span></p>
+                <p><strong>Risk Score:</strong> ${props.risk_score.toFixed(1)}</p>
+                <p><strong>Total Trees:</strong> ${props.total_trees}</p>
+                <p><strong>Average DBH:</strong> ${props.avg_dbh.toFixed(1)}"</p>
+                <p><strong>Condition Risk:</strong> ${props.condition_risk.toFixed(1)}%</p>
+                <p><strong>District:</strong> ${props.district}</p>
+            `;
+            
+            panel.classList.add('active');
+        }
+        
+        // Close info panel
+        function closeInfoPanel() {
+            document.getElementById('info-panel').classList.remove('active');
+        }
+        
+        // Get risk color
+        function getRiskColor(level) {
+            const colors = {
+                'Critical': '#c0392b',
+                'High': '#e67e22',
+                'Medium': '#f39c12',
+                'Low': '#27ae60'
+            };
+            return colors[level] || '#95a5a6';
+        }
+        
+        // Event listeners
+        document.getElementById('risk-min').addEventListener('input', updateRangeValues);
+        document.getElementById('risk-max').addEventListener('input', updateRangeValues);
+        document.getElementById('tree-min').addEventListener('input', updateRangeValues);
+        document.getElementById('show-trees').addEventListener('change', applyFilters);
+        
+        // Initialize
+        initMap();
+        loadData();
+    </script>
+</body>
+</html>
